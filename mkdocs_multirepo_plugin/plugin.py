@@ -210,7 +210,9 @@ class MultirepoPlugin(BasePlugin):
         need_to_derive_edit_uris = config.get("edit_uri") is None
 
         for nav_import, repo in zip(nav_imports, repos):
-            repo_config = repo.load_config()
+            # Get the effective keep_docs_dir for this repo (may override global setting)
+            effective_keep_docs_dir = repo.keep_docs_dir(global_keep_docs_dir=keep_docs_dir)
+            repo_config = repo.load_config(keep_docs_dir=effective_keep_docs_dir)
             if not repo_config.get("nav"):
                 raise ImportDocsException(
                     f"{repo.name}'s {repo.config} file doesn't have a nav section"

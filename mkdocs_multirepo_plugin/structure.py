@@ -400,11 +400,19 @@ class DocsRepo(Repo):
                 )
         return self
 
-    def load_config(self) -> Dict:
+    def load_config(self, keep_docs_dir: bool = False) -> Dict:
         """Loads the repo's multirepo config file"""
         config = super().load_config(self.config)
         if "nav" in config:
-            resolve_nav_paths(config.get("nav"), self.name)
+            # When keep_docs_dir is True, nav paths need to include the docs_dir path
+            # e.g., if docs_dir is "docs/docs/*", nav prefix becomes "section/docs/docs/"
+            if keep_docs_dir and self.docs_dir:
+                # Strip /* or /** suffix and combine with section name
+                docs_dir_path = self.docs_dir.replace("/**", "").replace("/*", "").rstrip("/")
+                nav_prefix = str(Path(self.name) / docs_dir_path)
+            else:
+                nav_prefix = self.name
+            resolve_nav_paths(config.get("nav"), nav_prefix)
         return config
 
 

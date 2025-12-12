@@ -167,11 +167,16 @@ class MultirepoPlugin(BasePlugin):
             new_config["plugins"] = plugin_collection
         # update theme
         if "theme" in new_config:
-            del new_config["theme"]["custom_dir"]
-            new_config["theme"] = Theme(
-                custom_dir=str(parent_repo.location / self.config.get("custom_dir")),
-                **new_config["theme"],
-            )
+            # Remove custom_dir if it exists (we'll set our own if configured)
+            new_config["theme"].pop("custom_dir", None)
+            custom_dir = self.config.get("custom_dir")
+            if custom_dir:
+                new_config["theme"] = Theme(
+                    custom_dir=str(parent_repo.location / custom_dir),
+                    **new_config["theme"],
+                )
+            else:
+                new_config["theme"] = Theme(**new_config["theme"])
         # update docs dir to point to temp_dir
         new_config["docs_dir"] = str(temp_dir / "docs")
         # resolve the nav paths

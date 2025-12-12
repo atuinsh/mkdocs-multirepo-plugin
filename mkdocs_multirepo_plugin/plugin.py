@@ -3,7 +3,7 @@ import tempfile
 from copy import deepcopy
 from dataclasses import _MISSING_TYPE, dataclass, field, fields
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import dacite as dc
 from mkdocs.config import Config, config_options
@@ -11,7 +11,24 @@ from mkdocs.plugins import BasePlugin
 from mkdocs.structure.files import File, Files
 from mkdocs.theme import Theme
 from slugify import slugify
-from typing_inspect import get_origin
+from typing_inspect import get_origin, get_args
+
+
+def get_config_type(field_type):
+    """Extract the actual type for MkDocs config validation.
+
+    Handles Optional[X] (Union[X, None]) by extracting X, since MkDocs's
+    config_options.Type cannot use Union with isinstance().
+    """
+    origin = get_origin(field_type)
+    if origin is Union:
+        # Optional[X] is Union[X, None] - extract the non-None type
+        args = [a for a in get_args(field_type) if a is not type(None)]
+        if len(args) == 1:
+            # It's Optional[X], return the inner type (or its origin for generics)
+            inner = args[0]
+            return get_origin(inner) or inner
+    return origin or field_type
 
 from .structure import (
     DocsRepo,
@@ -76,7 +93,7 @@ class MultirepoPlugin(BasePlugin):
         (
             f.name,
             config_options.Type(
-                get_origin(f.type) or f.type,
+                get_config_type(f.type),
                 default=f.default
                 if not isinstance(f.default, _MISSING_TYPE)
                 else f.default_factory(),

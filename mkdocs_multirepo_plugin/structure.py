@@ -208,6 +208,18 @@ class Repo:
             if config_file.is_file():
                 with open(config_file, "rb") as f:
                     return yaml_load(f)
+            # If config has a path (e.g., "docs/mkdocs.yml"), check if it was moved
+            # to the root by mv_docs_up.sh
+            elif "/" in yml_file:
+                config_basename = Path(yml_file).name
+                fallback_config = self.location / config_basename
+                if fallback_config.is_file():
+                    with open(fallback_config, "rb") as f:
+                        return yaml_load(f)
+                raise ImportDocsException(
+                    f"{self.name} doesn't have {yml_file} at {str(config_file)} "
+                    f"or {config_basename} at {str(fallback_config)}"
+                )
             else:
                 raise ImportDocsException(
                     f"{self.name} doesn't have {yml_file} at {str(config_file)}"

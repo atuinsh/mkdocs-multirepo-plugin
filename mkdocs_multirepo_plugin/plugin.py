@@ -154,11 +154,12 @@ class MultirepoPlugin(BasePlugin):
         # update plugins
         if "plugins" in new_config:
             plugins_copy = deepcopy(new_config["plugins"])
+            # Plugins to remove in imported_repo mode (they don't work well with merged configs)
+            plugins_to_remove = ["search", "multirepo", "git-revision-date-localized"]
             for p in plugins_copy:
-                if "search" in p:
-                    log.info("Multirepo removing search")
-                    new_config["plugins"].remove(p)
-                if "multirepo" in p:
+                plugin_name = p if isinstance(p, str) else list(p.keys())[0] if isinstance(p, dict) else None
+                if plugin_name in plugins_to_remove:
+                    log.info(f"Multirepo removing {plugin_name}")
                     new_config["plugins"].remove(p)
             # validate and provide PluginCollection object to config
             plugins = config_options.Plugins()

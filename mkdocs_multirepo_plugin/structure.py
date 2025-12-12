@@ -388,7 +388,10 @@ class DocsRepo(Repo):
             await self.sparse_clone([docs_dir, self.config] + self.extra_imports)
             self.transform_docs_dir()
         else:
-            await self.sparse_clone([self.docs_dir, self.config] + self.extra_imports)
+            # Strip /* from docs_dir for sparse-checkout (/* is a plugin convention, not a git glob)
+            # sparse-checkout needs just the directory path to get all files recursively
+            sparse_docs_dir = self.docs_dir.replace("/*", "/")
+            await self.sparse_clone([sparse_docs_dir, self.config] + self.extra_imports)
             if not self.keep_docs_dir(global_keep_docs_dir=keep_docs_dir):
                 await execute_bash_script(
                     "mv_docs_up.sh",

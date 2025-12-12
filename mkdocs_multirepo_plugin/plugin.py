@@ -81,7 +81,7 @@ class MultirepoConfig:
     keep_docs_dir: bool = False
     section_name: str = "imported"
     url: Optional[str] = None
-    dirs: Optional[List[str]] = None
+    paths: Optional[List[str]] = None
     custom_dir: Optional[str] = None
     yml_file: Optional[str] = None
     branch: Optional[str] = None

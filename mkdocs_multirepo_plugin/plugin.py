@@ -170,6 +170,12 @@ class MultirepoPlugin(BasePlugin):
         if "theme" in new_config:
             # Remove custom_dir if it exists (we'll set our own if configured)
             new_config["theme"].pop("custom_dir", None)
+            # Remove navigation.tabs since imported repos show single-section nav
+            if "features" in new_config["theme"]:
+                features = new_config["theme"]["features"]
+                new_config["theme"]["features"] = [
+                    f for f in features if f != "navigation.tabs"
+                ]
             custom_dir = self.config.get("custom_dir")
             if custom_dir:
                 new_config["theme"] = Theme(

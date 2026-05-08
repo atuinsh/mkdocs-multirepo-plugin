@@ -106,6 +106,7 @@ class MultirepoPlugin(BasePlugin):
         self.temp_dir: Path = None
         self.repos: Dict[str, DocsRepo] = {}
         self.nav_repos: Dict[str, DocsRepo] = {}
+        self._imported_llmstxt_sections: Dict[str, list] = {}
 
     def derive_config_edit_uri(
         self, repo_name: str, repo_url: str, config: Config
@@ -200,6 +201,36 @@ class MultirepoPlugin(BasePlugin):
         config["dev_addr"] = (addr.host, addr.port)
         return config, temp_dir
 
+    def _extract_repo_llmstxt_sections(self, repo_config, repo_name):
+        """Extract llmstxt sections from an imported repo's config.
+
+        If the repo has an llmstxt plugin with sections, prefixes all file
+        paths with the repo name so they match the file URIs in the parent site.
+        Returns a dict of section_name -> entries, or None if not configured.
+        """
+        llmstxt_cfg = None
+        for plugin_item in repo_config.get("plugins", []):
+            if isinstance(plugin_item, dict) and "llmstxt" in plugin_item:
+                llmstxt_cfg = plugin_item["llmstxt"]
+                break
+        if not llmstxt_cfg or not isinstance(llmstxt_cfg, dict):
+            return None
+        sections = llmstxt_cfg.get("sections")
+        if not sections:
+            return None
+
+        prefixed = {}
+        for section_name, entries in sections.items():
+            prefixed_entries = []
+            for entry in entries:
+                if isinstance(entry, str):
+                    prefixed_entries.append(f"{repo_name}/{entry}")
+                elif isinstance(entry, dict):
+                    path, desc = next(iter(entry.items()))
+                    prefixed_entries.append({f"{repo_name}/{path}": desc})
+            prefixed[section_name] = prefixed_entries
+        return prefixed
+
     def handle_nav_import(self, config: Config) -> Config:
         """Imports documentation in other repos based on nav configuration"""
         keep_docs_dir: bool = self.config.get("keep_docs_dir")
@@ -217,6 +248,11 @@ class MultirepoPlugin(BasePlugin):
                 raise ImportDocsException(
                     f"{repo.name}'s {repo.config} file doesn't have a nav section"
                 )
+            # Extract llmstxt sections from this repo (if configured)
+            llmstxt_sections = self._extract_repo_llmstxt_sections(repo_config, repo.name)
+            if llmstxt_sections:
+                self._imported_llmstxt_sections[repo.name] = llmstxt_sections
+                log.info(f"Multirepo plugin: imported llmstxt sections from {repo.name}")
             # mkdocs config values edit_uri and repo_url aren't set
             if need_to_derive_edit_uris:
                 derived_edit_uri = self.derive_config_edit_uri(
@@ -362,6 +398,15 @@ class MultirepoPlugin(BasePlugin):
                         # the file needs to know about the repo it belongs to
                         f.repo = repo
                         files.append(f)
+            # Inject imported llmstxt sections into the llmstxt plugin's config.
+            # This must happen in on_files (before llmstxt's on_files) so that
+            # the llmstxt plugin sees the merged sections when it processes pages.
+            if self._imported_llmstxt_sections:
+                llmstxt_plugin = config["plugins"].get("llmstxt")
+                if llmstxt_plugin is not None:
+                    for repo_name, sections in self._imported_llmstxt_sections.items():
+                        for section_name, entries in sections.items():
+                            llmstxt_plugin.config["sections"][section_name] = entries
             return files
 
     def on_nav(self, nav, config: Config, files: Files):
